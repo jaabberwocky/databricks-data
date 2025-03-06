@@ -335,6 +335,11 @@ display(parsed_docs_df)
 
 # COMMAND ----------
 
+output_path = "/Volumes/dbdemos_tobias/eu_ai/data/parsed_docs.parquet"
+parsed_docs_df.to_parquet(output_path)
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ### Call API to generate synthetic evaluation data
 
@@ -479,9 +484,8 @@ display(evals)
 # MAGIC
 # MAGIC         # Use the existing parsed_docs_df variable that contains our JSONL dataset
 # MAGIC         # This assumes parsed_docs_df is available in the notebook scope
-# MAGIC         databricks_docs_url = "/Volumes/dbdemos_tobias/eu_ai/data/eu_ai_act_chunks.jsonl"
-# MAGIC         parsed_docs_df = pd.read_json(databricks_docs_url, lines=True)
-# MAGIC         self.docs = parsed_docs_df.to_dict("records")
+# MAGIC         raw_docs_parquet = "https://github.com/jaabberwocky/databricks-data/raw/refs/heads/main/parsed_docs.parquet"
+# MAGIC         self.docs = pd.read_parquet(raw_docs_parquet).to_dict("records")
 # MAGIC
 # MAGIC         # Identify the function used as the retriever tool
 # MAGIC         self.tool_functions = {
@@ -696,7 +700,7 @@ import fc_agent
 from fc_agent import FunctionCallingAgent
 fc_agent = FunctionCallingAgent()
 
-response = fc_agent.predict(messages=[{"role": "user", "content": "What is the core purpose of the EU AI Act?"}])
+response = fc_agent.predict(messages=[{"role": "user", "content": dbutils.widgets.get("prompt")}])
 
 # COMMAND ----------
 
@@ -824,10 +828,7 @@ baseline_config = {
 
 llama405b_config = baseline_config.copy()
 llama405b_config["endpoint_name"] = "databricks-meta-llama-3-1-405b-instruct"
-llama405b_config, _ = log_and_evaluate_agent(
-    agent_config=llama405b_config,
-    run_name="llama-3-1-405b-instruct",
-)
+
 
 # If you have an External Model, such as OpenAI, uncomment this code, and replace `<my-external-model-endpoint-name>` to include this model in the evaluation
 # my_model_config = baseline_config.copy()
@@ -837,6 +838,13 @@ llama405b_config, _ = log_and_evaluate_agent(
 #     agent_config=my_model_config,
 #     run_name=my_model_config['endpoint_name'],
 # )
+
+# COMMAND ----------
+
+llama405b_config, _ = log_and_evaluate_agent(
+    agent_config=llama405b_config,
+    run_name="llama-3-1-405b-instruct",
+)
 
 # COMMAND ----------
 
@@ -888,16 +896,8 @@ uc_registered_model_info = mlflow.register_model(
 endpoint_name=f'{UC_MODEL_NAME}-endpoint-{uc_registered_model_info.version}'
 # Deploy to enable the review app and create an API endpoint
 deployment_info = agents.deploy(
-    model_name=UC_MODEL_NAME, model_version=uc_registered_model_info.version, endpoint_name=endpoint_name
+    model_name=UC_MODEL_NAME, model_version=uc_registered_model_info.version
 )
-
-# COMMAND ----------
-
-# query_endpoint is the URL that can be used to make queries to the app
-deployment_info.query_endpoint
-
-# Copy deployment.rag_app_url to browser and start interacting with your RAG application.
-deployment_info.rag_app_url
 
 # COMMAND ----------
 
